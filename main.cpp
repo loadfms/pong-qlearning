@@ -6,6 +6,7 @@
 
 QLearning qlearningRight(100, 3, 0.1, 0.9, 0.2);
 QLearning qlearningLeft(100, 3, 0.1, 0.9, 0.2);
+bool trainingAi = true;
 
 int main(void) {
   InitWindow(800, 450, "raylib [core] example - basic window");
@@ -13,125 +14,54 @@ int main(void) {
   SetWindowState(FLAG_VSYNC_HINT);
 
   const int speedFactor = 1;
-  const char *winnerText = nullptr;
+  std::string winnerText = "";
   const float initialBallSpeed = 200 * speedFactor;
   const float initialPaddleSpeed = 500 * speedFactor;
   int leftScore = 0;
   int rightScore = 0;
   bool paused = false;
 
-  Ball ball;
-
-  ball.x = GetScreenWidth() / 2.0f;
-  ball.y = GetScreenHeight() / 2.0f;
-  ball.radius = 5;
-  ball.speedX = initialBallSpeed;
-  ball.speedY = initialBallSpeed;
-  if (GetRandomValue(0, 1) == 0) {
-    ball.speedX *= -1;
-  }
-  if (GetRandomValue(0, 1) == 0) {
-    ball.speedY *= -1;
-  }
-
-  Paddle leftPaddle;
-  leftPaddle.x = 50;
-  leftPaddle.y = GetScreenHeight() / 2;
-  leftPaddle.width = 10;
-  leftPaddle.height = 100;
-  leftPaddle.speed = initialPaddleSpeed;
-
-  Paddle rightPaddle;
-  rightPaddle.x = GetScreenWidth() - 50;
-  rightPaddle.y = GetScreenHeight() / 2;
-  rightPaddle.width = 10;
-  rightPaddle.height = 100;
-  rightPaddle.speed = initialPaddleSpeed;
+  Ball ball(initialBallSpeed);
+  Paddle *rightPaddle = new Paddle(initialPaddleSpeed, true);
+  Paddle *leftPaddle = new Paddle(initialPaddleSpeed, false);
 
   while (!WindowShouldClose()) {
-    MoveAI(rightPaddle, ball, qlearningRight, true);
-    MoveAI(leftPaddle, ball, qlearningLeft, false);
+    if (trainingAi) {
+      MoveAI(*rightPaddle, ball, qlearningRight, true);
+      MoveAI(*leftPaddle, ball, qlearningLeft, false);
 
-    qlearningRight.UpdateEpsilon();
-
-    ball.x += ball.speedX * GetFrameTime();
-    ball.y += ball.speedY * GetFrameTime();
-
-    // Check if the ball goes out of bounds vertically
-    if (ball.y - ball.radius < 0) {
-      ball.y = ball.radius; // Ensure the ball stays within the top boundary
-      ball.speedY *= -1;    // Reverse the vertical direction
-    }
-    if (ball.y + ball.radius > GetScreenHeight()) {
-      ball.y = GetScreenHeight() -
-               ball.radius; // Ensure the ball stays within the bottom boundary
-      ball.speedY *= -1;    // Reverse the vertical direction
+      qlearningRight.UpdateEpsilon();
+      qlearningLeft.UpdateEpsilon();
     }
 
-    /*if (ball.y > GetScreenHeight() || ball.y < 0) {*/
-    /*  ball.speedY *= -1;*/
-    /*}*/
+    ball.Move();
 
     if (IsKeyDown(KEY_UP)) {
-      if (leftPaddle.y - leftPaddle.height / 2 > 0) {
-        leftPaddle.y -= leftPaddle.speed * GetFrameTime();
-      }
+      leftPaddle->MoveUp();
     }
 
     if (IsKeyDown(KEY_DOWN)) {
-      if (leftPaddle.y + leftPaddle.height / 2 < GetScreenHeight()) {
-        leftPaddle.y += leftPaddle.speed * GetFrameTime();
-      }
+      leftPaddle->MoveDown();
     }
 
-    if (CheckCollisionCircleRec({ball.x, ball.y}, ball.radius,
-                                leftPaddle.GetRect())) {
-      if (ball.speedX < 0) {
-        ball.speedX *= -1.1f;
-        ball.speedY =
-            (ball.y - leftPaddle.y) / (leftPaddle.height / 2) * ball.speedX;
-      }
-    }
+    ball.HandleCollision(rightPaddle);
+    ball.HandleCollision(leftPaddle);
 
-    if (CheckCollisionCircleRec({ball.x, ball.y}, ball.radius,
-                                rightPaddle.GetRect())) {
-      if (ball.speedX > 0) {
-        ball.speedX *= -1.1f;
-        ball.speedY =
-            (ball.y - rightPaddle.y) / (rightPaddle.height / 2) * -ball.speedX;
-      }
-    }
+    ball.CheckWinCondition(paused, winnerText, leftScore, rightScore);
 
-    if (ball.x < 0 && !paused) {
-      paused = true;
-      winnerText = "Right player wins!";
-      rightScore++;
-    }
-
-    if (ball.x > GetScreenWidth() && !paused) {
-      paused = true;
-      winnerText = "Left player wins!";
-      leftScore++;
-    }
-
-    /*if (winnerText && IsKeyPressed(KEY_SPACE)) {*/
-    if (winnerText && paused) {
+    if (winnerText != "" &&
+        ((trainingAi && paused) || IsKeyPressed(KEY_SPACE))) {
       ball.x = GetScreenWidth() / 2.0f;
       ball.y = GetScreenHeight() / 2.0f;
       ball.speedX = initialBallSpeed;
       ball.speedY = initialBallSpeed;
 
-      leftPaddle.y = GetScreenHeight() / 2;
-      rightPaddle.y = GetScreenHeight() / 2;
+      leftPaddle->ResetInitialValues(initialPaddleSpeed, false);
+      rightPaddle->ResetInitialValues(initialPaddleSpeed, true);
 
-      if (GetRandomValue(0, 1) == 0) {
-        ball.speedX *= -1;
-      }
-      if (GetRandomValue(0, 1) == 0) {
-        ball.speedY *= -1;
-      }
+      ball.ResetInitialValues(initialBallSpeed);
 
-      winnerText = nullptr;
+      winnerText = "";
       paused = false;
     }
 
@@ -140,8 +70,8 @@ int main(void) {
     ClearBackground(BLACK);
 
     ball.Draw();
-    leftPaddle.Draw();
-    rightPaddle.Draw();
+    leftPaddle->Draw();
+    rightPaddle->Draw();
 
     std::string leftScoreText = std::to_string(leftScore);
     std::string rightScoreText = std::to_string(rightScore);
@@ -155,9 +85,9 @@ int main(void) {
                  MeasureText(rightScoreText.c_str(), 30) / 2,
              10, 30, WHITE);
 
-    if (winnerText) {
-      DrawText(winnerText,
-               GetScreenWidth() / 2 - MeasureText(winnerText, 30) / 2,
+    if (winnerText != "" && trainingAi != true) {
+      DrawText(winnerText.c_str(),
+               GetScreenWidth() / 2 - MeasureText(winnerText.c_str(), 30) / 2,
                GetScreenHeight() / 2, 30, WHITE);
     }
 
@@ -166,6 +96,9 @@ int main(void) {
   }
 
   CloseWindow();
+
+  delete rightPaddle;
+  delete leftPaddle;
 
   return 0;
 }

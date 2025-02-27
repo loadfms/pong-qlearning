@@ -6,10 +6,7 @@
 
 void MoveAI(Paddle &paddle, Ball &ball, QLearning &ai, bool debug);
 
-float applyAction(float paddleY, int action, float speed, float screenHeight,
-                  float paddleHeight);
-
-/*int getReward(int ballZone, int paddleZone);*/
+void applyAction(Paddle &paddle, int action);
 
 int getReward(int ballY, float ballRadius, int paddleY, int paddleHeight);
 

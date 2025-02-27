@@ -12,12 +12,10 @@ void MoveAI(Paddle &paddle, Ball &ball, QLearning &qlearning, bool debug) {
   // Choose an action (0: stay, 1: move up, 2: move down)
   int action = qlearning.ChooseAction(state);
 
-  int newPaddleY = applyAction(paddle.y, action, paddle.speed,
-                               GetScreenHeight(), paddle.height);
-  paddle.y = newPaddleY;
+  applyAction(paddle, action);
 
   int nextState =
-      static_cast<int>(ball.y / 50) * 3 + static_cast<int>(newPaddleY / 50);
+      static_cast<int>(ball.y / 50) * 3 + static_cast<int>(paddle.y / 50);
 
   int reward = getReward(ball.y, ball.radius, paddle.y, paddle.height);
 
@@ -28,14 +26,12 @@ void MoveAI(Paddle &paddle, Ball &ball, QLearning &qlearning, bool debug) {
   }
 }
 
-float applyAction(float paddleY, int action, float speed, float screenHeight,
-                  float paddleHeight) {
-  if (action == 1 && paddleY - paddleHeight / 2 > 0) {
-    paddleY -= speed * GetFrameTime();
-  } else if (action == 2 && paddleY + paddleHeight < screenHeight) {
-    paddleY += speed * GetFrameTime();
+void applyAction(Paddle &paddle, int action) {
+  if (action == 1) {
+    paddle.MoveUp();
+  } else if (action == 2) {
+    paddle.MoveDown();
   }
-  return paddleY;
 }
 
 int getReward(int ballY, float ballRadius, int paddleY, int paddleHeight) {
@@ -43,20 +39,17 @@ int getReward(int ballY, float ballRadius, int paddleY, int paddleHeight) {
   // Calculate the vertical range of the ball (since it's a circle)*/
   float ballTop = ballY - ballRadius;
   float ballBottom = ballY + ballRadius;
+
+  // Calculate the vertical range of the paddle*/
   float paddleTop = paddleY - paddleHeight / 2;
   float paddleBottom = paddleY + paddleHeight / 2;
 
   // Reward if the ball is within the paddle's height*/
   if (ballBottom >= paddleTop && ballTop <= paddleBottom) {
-    reward = 20; // Ball is within paddle's height*/
+    reward = 10; // Ball is within paddle's height*/
   } else {
     reward = -std::abs(ballY - paddleY); // Penalize if ball is not near paddle
   }
-
-  // Reward for aligning paddle's center with ball's center*/
-  /*if (std::abs(ballY - paddleY) <= paddleHeight / 2) {*/
-  /*  reward += 5; // Reward for aligning centers*/
-  /*}*/
 
   return reward;
 }
