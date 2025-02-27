@@ -17,7 +17,8 @@ void MoveAI(Paddle &paddle, Ball &ball, QLearning &qlearning, bool debug) {
   int nextState =
       static_cast<int>(ball.y / 50) * 3 + static_cast<int>(paddle.y / 50);
 
-  int reward = getReward(ball.y, ball.radius, paddle.y, paddle.height);
+  int reward =
+      getReward(ball.y, ball.radius, paddle.y, paddle.height, paddle.speed);
 
   qlearning.UpdateQValue(state, action, reward, nextState);
 
@@ -34,8 +35,10 @@ void applyAction(Paddle &paddle, int action) {
   }
 }
 
-int getReward(int ballY, float ballRadius, int paddleY, int paddleHeight) {
+int getReward(int ballY, float ballRadius, int paddleY, int paddleHeight,
+              int paddleSpeed) {
   int reward = 0;
+
   // Calculate the vertical range of the ball (since it's a circle)*/
   float ballTop = ballY - ballRadius;
   float ballBottom = ballY + ballRadius;
@@ -44,11 +47,25 @@ int getReward(int ballY, float ballRadius, int paddleY, int paddleHeight) {
   float paddleTop = paddleY - paddleHeight / 2;
   float paddleBottom = paddleY + paddleHeight / 2;
 
-  // Reward if the ball is within the paddle's height*/
+  // Reward if the ball is within the paddle's height
   if (ballBottom >= paddleTop && ballTop <= paddleBottom) {
-    reward = 10; // Ball is within paddle's height*/
+    reward = 10; // Ball is within paddle's height
   } else {
-    reward = -std::abs(ballY - paddleY); // Penalize if ball is not near paddle
+    // Penalize if the ball is not near the paddle
+    reward = -std::abs(ballY - paddleY); // The farther the ball from the
+                                         // paddle, the bigger the penalty
+  }
+
+  // Encourage the paddle to move toward the ball
+  if (ballY < paddleY) {
+    reward += 5; // Reward for moving up towards the ball
+  } else if (ballY > paddleY) {
+    reward += 5; // Reward for moving down towards the ball
+  }
+
+  // Penalize if the paddle is not moving or is moving away from the ball
+  if (paddleSpeed < 0) {
+    reward -= 3;
   }
 
   return reward;

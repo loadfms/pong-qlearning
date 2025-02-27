@@ -8,7 +8,8 @@ void MoveAI(Paddle &paddle, Ball &ball, QLearning &ai, bool debug);
 
 void applyAction(Paddle &paddle, int action);
 
-int getReward(int ballY, float ballRadius, int paddleY, int paddleHeight);
+int getReward(int ballY, float ballRadius, int paddleY, int paddleHeight,
+              int paddleSpeed);
 
 void DrawZones(Ball &ball, Paddle &paddle);
 
