@@ -1,12 +1,7 @@
 #include "include/AI.h"
-#include "include/QLearning.h"
 #include "include/game_objects.h"
 #include "raylib.h"
 #include <string>
-
-QLearning qlearningRight(100, 3, 0.1, 0.9, 0.2);
-QLearning qlearningLeft(100, 3, 0.1, 0.9, 0.2);
-bool trainingAi = true;
 
 int main(void) {
   InitWindow(800, 450, "raylib [core] example - basic window");
@@ -26,14 +21,6 @@ int main(void) {
   Paddle *leftPaddle = new Paddle(initialPaddleSpeed, false);
 
   while (!WindowShouldClose()) {
-    if (trainingAi) {
-      MoveAI(*rightPaddle, ball, qlearningRight, true);
-      MoveAI(*leftPaddle, ball, qlearningLeft, false);
-
-      qlearningRight.UpdateEpsilon();
-      qlearningLeft.UpdateEpsilon();
-    }
-
     ball.Move();
 
     if (IsKeyDown(KEY_UP)) {
@@ -44,13 +31,20 @@ int main(void) {
       leftPaddle->MoveDown();
     }
 
+    if (IsKeyDown(KEY_K)) {
+      rightPaddle->MoveUp();
+    }
+
+    if (IsKeyDown(KEY_J)) {
+      rightPaddle->MoveDown();
+    }
+
     ball.HandleCollision(rightPaddle);
     ball.HandleCollision(leftPaddle);
 
     ball.CheckWinCondition(paused, winnerText, leftScore, rightScore);
 
-    if (winnerText != "" &&
-        ((trainingAi && paused) || IsKeyPressed(KEY_SPACE))) {
+    if (winnerText != "" && IsKeyPressed(KEY_SPACE)) {
       ball.x = GetScreenWidth() / 2.0f;
       ball.y = GetScreenHeight() / 2.0f;
       ball.speedX = initialBallSpeed;
@@ -85,7 +79,7 @@ int main(void) {
                  MeasureText(rightScoreText.c_str(), 30) / 2,
              10, 30, WHITE);
 
-    if (winnerText != "" && trainingAi != true) {
+    if (winnerText != "") {
       DrawText(winnerText.c_str(),
                GetScreenWidth() / 2 - MeasureText(winnerText.c_str(), 30) / 2,
                GetScreenHeight() / 2, 30, WHITE);
