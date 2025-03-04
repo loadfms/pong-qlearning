@@ -87,17 +87,17 @@ public:
     }
   }
 
-  void CheckWinCondition(bool &paused, std::string &winnerText, int &leftScore,
-                         int &rightScore) {
+  void CheckWinCondition(std::string &state, std::string &winnerText,
+                         int &leftScore, int &rightScore) {
 
-    if (x < 0 && !paused) {
-      paused = true;
+    if (x < 0 && state != "PAUSED") {
+      state = "PAUSED";
       winnerText = "Right player wins!";
       rightScore++;
     }
 
-    if (x > GetScreenWidth() && !paused) {
-      paused = true;
+    if (x > GetScreenWidth() && state != "PAUSED") {
+      state = "PAUSED";
       winnerText = "Left player wins!";
       leftScore++;
     }
