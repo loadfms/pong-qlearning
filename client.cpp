@@ -35,9 +35,15 @@ int main() {
   socket.open(udp::v4());
   socket.non_blocking(true); // Make socket non-blocking
 
+  bool hello = false;
   udp::endpoint server_endpoint(asio::ip::make_address(SERVER_IP), SERVER_PORT);
 
   std::cout << "Client started. Press W/S (Left) or UP/DOWN (Right) to move.\n";
+
+  if (!hello) {
+    socket.send_to(asio::buffer("HELLO_RIGHT_BRUXARIA"), server_endpoint);
+    hello = true;
+  }
 
   while (true) {
     char key = getKeyPress();
@@ -72,7 +78,7 @@ int main() {
 
     if (!error && len > 0) {
       std::string receivedData(data, len);
-      std::cout << "Received from server: " << receivedData << std::endl;
+      /*std::cout << "Received from server: " << receivedData << std::endl;*/
     }
 
     std::this_thread::sleep_for(

@@ -10,6 +10,21 @@ using asio::ip::udp;
 
 const int PORT = 54000;
 std::atomic<bool> running(true);
+std::string state = "WAITING";
+std::string rightTeamName = "";
+std::string leftTeamName = "";
+
+std::string extractAfterSecondUnderscore(const std::string &command) {
+  size_t firstUnderscorePos = command.find("_");
+  if (firstUnderscorePos == std::string::npos)
+    return "";
+
+  size_t secondUnderscorePos = command.find("_", firstUnderscorePos + 1);
+  if (secondUnderscorePos == std::string::npos)
+    return "";
+
+  return command.substr(secondUnderscorePos + 1);
+}
 
 void sendBallPosition(udp::socket &socket, std::vector<udp::endpoint> &clients,
                       Ball &ball) {
@@ -43,19 +58,40 @@ void receiveCommands(udp::socket &socket, std::vector<udp::endpoint> &clients,
     if (!error) {
       std::string command(data, len);
 
-      auto it = std::find(clients.begin(), clients.end(), remote_endpoint);
-      if (it == clients.end()) {
-        clients.push_back(remote_endpoint);
+      if (command.find("HELLO") != std::string::npos) {
+        auto it = std::find_if(clients.begin(), clients.end(),
+                               [&](const udp::endpoint &client) {
+                                 return client == remote_endpoint;
+                               });
+        if (it == clients.end()) {
+          clients.push_back(remote_endpoint);
+        }
+
+        if (command.find("RIGHT") == std::string::npos) {
+          rightTeamName = extractAfterSecondUnderscore(command);
+          std::cout << rightTeamName << std::endl;
+        }
+
+        if (command.find("LEFT") == std::string::npos) {
+          leftTeamName = extractAfterSecondUnderscore(command);
+          std::cout << leftTeamName << std::endl;
+        }
       }
 
-      if (command == "LEFT_UP")
-        leftPaddle->MoveUp();
-      if (command == "LEFT_DOWN")
-        leftPaddle->MoveDown();
-      if (command == "RIGHT_UP")
-        rightPaddle->MoveUp();
-      if (command == "RIGHT_DOWN")
-        rightPaddle->MoveDown();
+      if (clients.size() == 2 && state != "PAUSED") {
+        state = "RUNNING";
+      }
+
+      if (state == "RUNNING") {
+        if (command == "LEFT_UP")
+          leftPaddle->MoveUp();
+        if (command == "LEFT_DOWN")
+          leftPaddle->MoveDown();
+        if (command == "RIGHT_UP")
+          rightPaddle->MoveUp();
+        if (command == "RIGHT_DOWN")
+          rightPaddle->MoveDown();
+      }
     }
 
     std::this_thread::sleep_for(
@@ -63,12 +99,29 @@ void receiveCommands(udp::socket &socket, std::vector<udp::endpoint> &clients,
   }
 }
 
+void drawUI(int rightScore, int leftScore) {
+  std::string rightScoreString = std::to_string(rightScore);
+  const char *rightScoreCStr = rightScoreString.c_str();
+
+  DrawText(rightTeamName.c_str(),
+           GetScreenWidth() - MeasureText(rightTeamName.c_str(), 20) - 40, 20,
+           20, WHITE);
+
+  DrawText(rightScoreCStr, GetScreenWidth() - 20, 20, 20, WHITE);
+
+  std::string leftScoreString = std::to_string(leftScore);
+  const char *leftScoreCStr = leftScoreString.c_str();
+
+  DrawText(leftTeamName.c_str(), 40, 20, 20, WHITE);
+
+  DrawText(leftScoreCStr, 20, 20, 20, WHITE);
+}
+
 int main() {
   InitWindow(800, 450, "Multiplayer Pong Server");
   SetWindowState(FLAG_VSYNC_HINT);
   SetWindowPosition(100, 100);
 
-  std::string state = "RUNNING";
   std::string winnerText = "";
   int leftScore = 0;
   int rightScore = 0;
@@ -88,9 +141,12 @@ int main() {
                             std::ref(clients), &leftPaddle, &rightPaddle);
 
   while (!WindowShouldClose()) {
-    ball.Move();
-    ball.HandleCollision(&rightPaddle);
-    ball.HandleCollision(&leftPaddle);
+
+    if (state == "RUNNING") {
+      ball.Move();
+      ball.HandleCollision(&rightPaddle);
+      ball.HandleCollision(&leftPaddle);
+    }
 
     ball.CheckWinCondition(state, winnerText, leftScore, rightScore);
 
@@ -117,7 +173,17 @@ int main() {
     leftPaddle.Draw();
     rightPaddle.Draw();
 
-    if (winnerText != "") {
+    drawUI(rightScore, leftScore);
+
+    if (state == "WAITING") {
+      std::string waitingMsg =
+          "Waiting for players... (" + std::to_string(clients.size()) + "/2)";
+      DrawText(waitingMsg.c_str(),
+               GetScreenWidth() / 2 - MeasureText(waitingMsg.c_str(), 30) / 2,
+               GetScreenHeight() / 2, 30, WHITE);
+    }
+
+    if (winnerText != "" && state == "PAUSED") {
       DrawText(winnerText.c_str(),
                GetScreenWidth() / 2 - MeasureText(winnerText.c_str(), 30) / 2,
                GetScreenHeight() / 2, 30, WHITE);
