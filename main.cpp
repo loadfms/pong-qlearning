@@ -1,46 +1,76 @@
-#include "include/AI.h"
 #include "include/game_objects.h"
 #include "raylib.h"
+#include <asio.hpp>
+#include <atomic>
+#include <iostream>
 #include <string>
+#include <thread>
 
-int main(void) {
-  InitWindow(800, 450, "raylib [core] example - basic window");
-  SetWindowPosition(100, 100); // Set a specific position for the window
+using asio::ip::udp;
+
+const int PORT = 54000;
+std::atomic<bool> running(true);
+
+void receiveCommands(udp::socket &socket, udp::endpoint &remote_endpoint,
+                     Paddle *leftPaddle, Paddle *rightPaddle) {
+  char data[1024];
+  socket.non_blocking(true);
+
+  while (running) {
+    asio::error_code error;
+    size_t len = socket.receive_from(asio::buffer(data, 1024), remote_endpoint,
+                                     0, error);
+
+    if (error && error != asio::error::would_block) {
+      std::cerr << "Receive error: " << error.message() << std::endl;
+      continue;
+    }
+
+    if (!error) {
+      std::string command(data, len);
+      if (command == "LEFT_UP")
+        leftPaddle->MoveUp();
+      if (command == "LEFT_DOWN")
+        leftPaddle->MoveDown();
+      if (command == "RIGHT_UP")
+        rightPaddle->MoveUp();
+      if (command == "RIGHT_DOWN")
+        rightPaddle->MoveDown();
+    }
+
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(10)); // Prevent CPU overuse
+  }
+}
+
+int main() {
+  InitWindow(800, 450, "Multiplayer Pong Server");
   SetWindowState(FLAG_VSYNC_HINT);
+  SetWindowPosition(100, 100);
 
-  const int speedFactor = 1;
+  bool paused = false;
   std::string winnerText = "";
-  const float initialBallSpeed = 200 * speedFactor;
-  const float initialPaddleSpeed = 500 * speedFactor;
   int leftScore = 0;
   int rightScore = 0;
-  bool paused = false;
 
+  asio::io_context io_context;
+  udp::socket socket(io_context, udp::endpoint(udp::v4(), PORT));
+  udp::endpoint remote_endpoint;
+
+  const float initialBallSpeed = 200;
+  const float initialPaddleSpeed = 500;
   Ball ball(initialBallSpeed);
-  Paddle *rightPaddle = new Paddle(initialPaddleSpeed, true);
-  Paddle *leftPaddle = new Paddle(initialPaddleSpeed, false);
+  Paddle leftPaddle(initialPaddleSpeed, false);
+  Paddle rightPaddle(initialPaddleSpeed, true);
+
+  std::thread networkThread(receiveCommands, std::ref(socket),
+                            std::ref(remote_endpoint), &leftPaddle,
+                            &rightPaddle);
 
   while (!WindowShouldClose()) {
     ball.Move();
-
-    if (IsKeyDown(KEY_UP)) {
-      leftPaddle->MoveUp();
-    }
-
-    if (IsKeyDown(KEY_DOWN)) {
-      leftPaddle->MoveDown();
-    }
-
-    if (IsKeyDown(KEY_K)) {
-      rightPaddle->MoveUp();
-    }
-
-    if (IsKeyDown(KEY_J)) {
-      rightPaddle->MoveDown();
-    }
-
-    ball.HandleCollision(rightPaddle);
-    ball.HandleCollision(leftPaddle);
+    ball.HandleCollision(&rightPaddle);
+    ball.HandleCollision(&leftPaddle);
 
     ball.CheckWinCondition(paused, winnerText, leftScore, rightScore);
 
@@ -50,8 +80,8 @@ int main(void) {
       ball.speedX = initialBallSpeed;
       ball.speedY = initialBallSpeed;
 
-      leftPaddle->ResetInitialValues(initialPaddleSpeed, false);
-      rightPaddle->ResetInitialValues(initialPaddleSpeed, true);
+      leftPaddle.ResetInitialValues(initialPaddleSpeed, false);
+      rightPaddle.ResetInitialValues(initialPaddleSpeed, true);
 
       ball.ResetInitialValues(initialBallSpeed);
 
@@ -60,24 +90,10 @@ int main(void) {
     }
 
     BeginDrawing();
-
     ClearBackground(BLACK);
-
     ball.Draw();
-    leftPaddle->Draw();
-    rightPaddle->Draw();
-
-    std::string leftScoreText = std::to_string(leftScore);
-    std::string rightScoreText = std::to_string(rightScore);
-
-    DrawText(leftScoreText.c_str(),
-             GetScreenWidth() / 4 - MeasureText(leftScoreText.c_str(), 30) / 2,
-             10, 30, WHITE);
-
-    DrawText(rightScoreText.c_str(),
-             GetScreenWidth() * 3 / 4 -
-                 MeasureText(rightScoreText.c_str(), 30) / 2,
-             10, 30, WHITE);
+    leftPaddle.Draw();
+    rightPaddle.Draw();
 
     if (winnerText != "") {
       DrawText(winnerText.c_str(),
@@ -89,10 +105,10 @@ int main(void) {
     EndDrawing();
   }
 
+  running = false;
+  socket.close();
+  networkThread.join();
+
   CloseWindow();
-
-  delete rightPaddle;
-  delete leftPaddle;
-
   return 0;
 }

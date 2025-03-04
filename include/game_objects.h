@@ -89,6 +89,7 @@ public:
 
   void CheckWinCondition(bool &paused, std::string &winnerText, int &leftScore,
                          int &rightScore) {
+
     if (x < 0 && !paused) {
       paused = true;
       winnerText = "Right player wins!";

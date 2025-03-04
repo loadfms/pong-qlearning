@@ -2,13 +2,19 @@ CC = g++
 CFLAGS = -Wall -Iinclude  # Add include folder for header files
 LDFLAGS = -lraylib -lGL -lm -lpthread -ldl -lrt -lX11
 
-all: my_game
+all: server client  # Build both server and client
 
-my_game: main.cpp AI.cpp QLearning.cpp
-	$(CC) $(CFLAGS) -o my_game main.cpp AI.cpp QLearning.cpp $(LDFLAGS)
+server: main.cpp 
+	$(CC) $(CFLAGS) -o server main.cpp $(LDFLAGS)
+
+client: client.cpp
+	$(CC) $(CFLAGS) -o client client.cpp $(LDFLAGS)
 
 clean:
-	rm -f my_game
+	rm -f server client
 
-run: my_game
-	./my_game
+run-server: server
+	./server
+
+run-client: client
+	./client
